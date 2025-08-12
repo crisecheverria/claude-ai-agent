@@ -17,11 +17,19 @@ def add_assistant_message(messages, text):
     messages.append(assistant_message)
 
 
-def chat(messages, system=None):
+# Temperature Ranges 0.0 to 1.0
+# Temperature controls the randomness of the output.
+# Low Temp (0.0 - 0.3): More deterministic, focused responses, factual responses, coding assistance.
+# Medium Temp (0.4 - 0.7): Balanced, creative yet coherent, educational responses, problem-solving.
+# High Temp (0.8 - 1.0): Highly creative, more varied responses, brainstorming, storytelling.
+
+
+def chat(messages, system=None, temperature=0.7):
     params = {
         "max_tokens": 1024,
         "model": "claude-3-5-sonnet-20241022",
         "messages": messages,
+        "temperature": temperature,
     }
 
     if system:
