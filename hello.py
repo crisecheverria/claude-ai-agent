@@ -17,10 +17,17 @@ def add_assistant_message(messages, text):
     messages.append(assistant_message)
 
 
-def chat(messages):
-    message = client.messages.create(
-        model="claude-3-5-sonnet-20241022", max_tokens=1024, messages=messages
-    )
+def chat(messages, system=None):
+    params = {
+        "max_tokens": 1024,
+        "model": "claude-3-5-sonnet-20241022",
+        "messages": messages,
+    }
+
+    if system:
+        params["system"] = system
+
+    message = client.messages.create(**params)
 
     return message.content[0].text
 
@@ -29,6 +36,14 @@ def main():
     print("Hello from claude!. Type 'exit' or 'quit' to end the chat.")
     # Initialize the conversation
     messages = []
+
+    system = """
+    You are a patient math tutor.
+    Do not directly answer a student's question.
+    Guide them to a solution step by step.
+    """
+    # system = "You are a helpful coding assistant who provides clear and concise explanations."
+
     while True:
         user_input = input("> ")
         if user_input.lower() in ["exit", "quit"]:
@@ -36,7 +51,7 @@ def main():
             break
 
         add_user_message(messages, user_input)
-        response = chat(messages)
+        response = chat(messages, system=system)
         add_assistant_message(messages, response)
 
         print(f"🤖 {response}")
