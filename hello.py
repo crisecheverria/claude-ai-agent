@@ -26,15 +26,20 @@ def chat(messages):
 
 
 def main():
-    print("Hello from claude-api-test!")
+    print("Hello from claude!. Type 'exit' or 'quit' to end the chat.")
+    # Initialize the conversation
     messages = []
-    add_user_message(messages, "What's is quantum computer? Short answer.")
-    answer = chat(messages)
-    print("Assistant:", answer)
-    add_assistant_message(messages, answer)
-    add_user_message(messages, "Write another sentence?")
-    answer = chat(messages)
-    print("Assistant:", answer)
+    while True:
+        user_input = input("> ")
+        if user_input.lower() in ["exit", "quit"]:
+            print("Exiting the chat. Goodbye!")
+            break
+
+        add_user_message(messages, user_input)
+        response = chat(messages)
+        add_assistant_message(messages, response)
+
+        print(f"🤖 {response}")
 
 
 if __name__ == "__main__":
