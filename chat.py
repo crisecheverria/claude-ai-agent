@@ -59,7 +59,7 @@ def main():
             break
 
         add_user_message(messages, user_input)
-        response = chat(messages, system=system)
+        response = chat(messages)
         add_assistant_message(messages, response)
 
         print(f"🤖 {response}")
