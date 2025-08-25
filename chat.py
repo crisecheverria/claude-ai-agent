@@ -1,7 +1,7 @@
 import os
-import json
 from dotenv import load_dotenv
 from anthropic import Anthropic
+from anthropic.types import Message
 
 load_dotenv()
 
@@ -47,14 +47,26 @@ tools = [
 ]
 
 
-def add_user_message(messages, text):
-    user_message = {"role": "user", "content": text}
+def add_user_message(messages, message):
+    user_message = {
+        "role": "user", 
+        "content": message.content if isinstance(message, Message) else message
+    }
     messages.append(user_message)
 
 
-def add_assistant_message(messages, text):
-    assistant_message = {"role": "assistant", "content": text}
+def add_assistant_message(messages, message):
+    assistant_message = {
+        "role": "assistant", 
+        "content": message.content if isinstance(message, Message) else message
+    }
     messages.append(assistant_message)
+
+
+def text_from_message(message):
+    return "\n".join(
+        [block.text for block in message.content if block.type == "text"]
+    )
 
 
 # Temperature Ranges 0.0 to 1.0
@@ -64,82 +76,37 @@ def add_assistant_message(messages, text):
 # High Temp (0.8 - 1.0): Highly creative, more varied responses, brainstorming, storytelling.
 
 
-def chat(messages, system=None, temperature=0.7):
+def chat(messages, system=None, temperature=0.7, tools=None):
     try:
         params = {
             "max_tokens": 1024,
             "model": "claude-3-5-sonnet-20241022",
             "messages": messages,
-            "temperature": temperature,
-            "tools": tools
+            "temperature": temperature
         }
+        
+        if tools:
+            params["tools"] = tools
 
         if system:
             params["system"] = system
 
         message = client.messages.create(**params)
-
-        # Handle tool use
-        if message.stop_reason == "tool_use":
-            # Add the assistant's tool use message to conversation
-            messages.append({
-                "role": "assistant",
-                "content": message.content
-            })
-            
-            # Process tool results
-            tool_results = []
-            for content_block in message.content:
-                if content_block.type == "tool_use":
-                    tool_name = content_block.name
-                    tool_input = content_block.input
-                    
-                    if tool_name == "create_file":
-                        result = create_file_tool(tool_input["file_path"], tool_input["content"])
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": content_block.id,
-                            "content": result
-                        })
-            
-            # Add tool results as user message
-            messages.append({
-                "role": "user",
-                "content": tool_results
-            })
-            
-            # Get Claude's response to the tool results
-            follow_up_params = {
-                "model": "claude-3-5-sonnet-20241022",
-                "max_tokens": 1024,
-                "messages": messages,
-                "tools": tools,
-                "temperature": temperature
-            }
-            
-            if system:
-                follow_up_params["system"] = system
-                
-            follow_up_response = client.messages.create(**follow_up_params)
-            
-            return follow_up_response.content[0].text
-        
-        # Regular text response
-        return message.content[0].text
+        return message
         
     except Exception as e:
         return f"API Error: {str(e)}"
 
 
 def main():
-    print("Hello from claude! I can help with math and also create files for you.")
+    print("Hello from claude! I can help with math/coding problems.")
     print("Type 'exit' or 'quit' to end the chat.")
     # Initialize the conversation
     messages = []
 
     system = """
     You are a helpful assistant that can:
-    1. Help with math problems as a patient tutor (guide step by step)
+    1. Help with math, or coding problems as a patient tutor (guide step by step)
     2. Create files when requested using the create_file tool
     
     When users ask you to create, write, or save a file, use the create_file tool with the appropriate file path and content.
@@ -152,10 +119,12 @@ def main():
             break
 
         add_user_message(messages, user_input)
-        response = chat(messages, system)
+        response = chat(messages, system, tools=tools)
         add_assistant_message(messages, response)
 
-        print(f"🤖 {response}")
+        # Extract text from the response for display
+        response_text = text_from_message(response) if isinstance(response, Message) else str(response)
+        print(f"🤖 {response_text}")
 
 
 if __name__ == "__main__":
