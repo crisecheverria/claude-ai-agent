@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 from anthropic import Anthropic
 from anthropic.types import Message
@@ -69,6 +70,65 @@ def text_from_message(message):
     )
 
 
+def run_tool(tool_name, tool_input):
+    """Route tool requests to their implementations"""
+    if tool_name == "create_file":
+        return create_file_tool(tool_input["file_path"], tool_input["content"])
+    else:
+        raise ValueError(f"Unknown tool: {tool_name}")
+
+
+def run_tools(message):
+    """Execute all tool requests in a message and return tool result blocks"""
+    tool_requests = [
+        block for block in message.content if block.type == "tool_use"
+    ]
+    tool_result_blocks = []
+    
+    for tool_request in tool_requests:
+        try:
+            tool_output = run_tool(tool_request.name, tool_request.input)
+            tool_result_block = {
+                "type": "tool_result",
+                "tool_use_id": tool_request.id,
+                "content": json.dumps(tool_output),
+                "is_error": False
+            }
+        except Exception as e:
+            tool_result_block = {
+                "type": "tool_result", 
+                "tool_use_id": tool_request.id,
+                "content": f"Error: {e}",
+                "is_error": True
+            }
+        
+        tool_result_blocks.append(tool_result_block)
+    
+    return tool_result_blocks
+
+
+def run_conversation(messages, system=None, temperature=0.7, tools=None):
+    """Run a multi-turn conversation with tools until Claude provides a final answer"""
+    while True:
+        response = chat(messages, system, temperature, tools)
+        add_assistant_message(messages, response)
+        
+        # Display Claude's response (including any text before tool calls)
+        response_text = text_from_message(response)
+        if response_text.strip():
+            print(f"🤖 {response_text}")
+        
+        # Check if Claude wants to use tools
+        if response.stop_reason != "tool_use":
+            break
+            
+        # Execute tools and add results to conversation
+        tool_results = run_tools(response)
+        add_user_message(messages, tool_results)
+    
+    return messages
+
+
 # Temperature Ranges 0.0 to 1.0
 # Temperature controls the randomness of the output.
 # Low Temp (0.0 - 0.3): More deterministic, focused responses, factual responses, coding assistance.
@@ -119,12 +179,7 @@ def main():
             break
 
         add_user_message(messages, user_input)
-        response = chat(messages, system, tools=tools)
-        add_assistant_message(messages, response)
-
-        # Extract text from the response for display
-        response_text = text_from_message(response) if isinstance(response, Message) else str(response)
-        print(f"🤖 {response_text}")
+        run_conversation(messages, system, tools=tools)
 
 
 if __name__ == "__main__":
